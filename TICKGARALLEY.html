@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>画像ギャラリー（Drive埋め込み・ページング対応・CORS対応）</title>
+  <style>
+    html, body {
+      font-family: sans-serif;
+      background: #f9f9f9;
+      padding: 20px;
+      text-align: center;
+      overflow: auto;
+      width: 100%;
+      margin: 0;
+    }
+    h1 {
+      margin-bottom: 1em;
+    }
+    .gallery-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      min-width: 3640px;
+      margin: 0 auto;
+      position: relative;
+      left: 0;
+    }
+    .gallery {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      width: auto;
+    }
+    iframe {
+      border: none;
+      border-radius: 12px;
+      width: 1800px;
+      height: 220px;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    button {
+      margin: 5px;
+      padding: 5px 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    input[type="datetime-local"] {
+      margin-bottom: 20px;
+      padding: 5px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>画像ギャラリー（Drive埋め込み・ページング対応・CORS対応）</h1>
+
+  <input type="datetime-local" id="dateTimeInput">
+  <div>
+    <button onclick="adjustTime(-60)">1時間戻す</button>
+    <button onclick="adjustTime(-5)">5分戻す</button>
+    <button onclick="adjustTime(5)">5分進む</button>
+    <button onclick="adjustTime(60)">1時間進む</button>
+    <button onclick="resetGallery()">再読み込み</button>
+  </div>
+
+  <div class="gallery-container">
+    <div class="gallery" id="galleryToday">当日の画像を読み込み中...</div>
+    <div class="gallery" id="galleryYesterday">前日の画像を読み込み中...</div>
+  </div>
+  <button id="loadMore">続きを表示</button>
+
+  <script>
+    let offset = 0;
+    const limit = 10;
+
+    const galleryToday = document.getElementById("galleryToday");
+    const galleryYesterday = document.getElementById("galleryYesterday");
+    const loadMoreBtn = document.getElementById("loadMore");
+    const dateTimeInput = document.getElementById("dateTimeInput");
+
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    dateTimeInput.value = now.toISOString().slice(0,16);
+
+    function getFormattedDate(date) {
+      const y = String(date.getFullYear()).slice(2);
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      const h = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+      return `${y}-${m}-${d}-${h}-${min}`;
+    }
+
+    function adjustTime(minutes) {
+      const date = new Date(dateTimeInput.value);
+      date.setMinutes(date.getMinutes() + minutes);
+      dateTimeInput.value = date.toISOString().slice(0,16);
+    }
+
+    function resetGallery() {
+      offset = 0;
+      galleryToday.innerHTML = '';
+      galleryYesterday.innerHTML = '';
+      loadMoreBtn.style.display = "block";
+      loadImages();
+    }
+
+    async function loadImages() {
+      const inputDate = new Date(dateTimeInput.value);
+      inputDate.setHours(inputDate.getHours() - 6);
+      const today = new Date(inputDate);
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+
+      const todayFormatted = getFormattedDate(today);
+      const yesterdayFormatted = getFormattedDate(yesterday);
+
+      const baseUrl = 'https://script.google.com/macros/s/AKfycbwbRE5vPimMrspDJGJOFYj_RsCx5J_8bBPHh3D-o2uI4MVqS5kjk9wxWUTufgTGaGqN/exec';
+
+      const todayUrls = await fetchImages(`${baseUrl}?afterDate=${todayFormatted}&offset=${offset}&limit=${limit}`);
+      const yesterdayUrls = await fetchImages(`${baseUrl}?afterDate=${yesterdayFormatted}&offset=${offset}&limit=${limit}`);
+
+      displayImages(todayUrls, galleryToday);
+      displayImages(yesterdayUrls, galleryYesterday);
+    }
+
+    async function fetchImages(url) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Network response was not ok');
+        return await response.json();
+      } catch (error) {
+        console.error('Fetch error:', error);
+        return [];
+      }
+    }
+
+    function displayImages(urls, galleryElement) {
+      if (!urls.length && offset === 0) galleryElement.textContent = "画像が見つかりませんでした。";
+
+      urls.forEach(url => {
+        const iframe = document.createElement("iframe");
+        iframe.src = url;
+        iframe.loading = "lazy";
+        galleryElement.appendChild(iframe);
+      });
+
+      if (urls.length < limit) loadMoreBtn.style.display = "none";
+    }
+
+    loadMoreBtn.addEventListener("click", () => {
+      offset += limit;
+      loadImages();
+    });
+
+    loadImages();
+  </script>
+</body>
+</html>
