@@ -118,7 +118,7 @@ async function loadAndDisplayImages(dateObj) {
 
   while (retries < maxRetries && !imagesLoaded) {
     const formattedDate = getFormattedDate(dateObj);
-    const url = `https://script.google.com/macros/s/AKfycbxdMEGa4DpqZElP2wALr_NIEWt4kvfWA3d6sfFlXBsPkQGINBWAMv3NzRNx4gCatRQV/exec?afterDate=${formattedDate}&limit=12`;
+    const url = `https://script.google.com/macros/s/AKfycbxdMEGa4DpqZElP2wALr_NIEWt4kvfWA3d6sfFlXBsPkQGINBWAMv3NzRNx4gCatRQV/exec?afterDate=${formattedDate}&limit=1`;
 
     const items = await fetchImages(url);
 
