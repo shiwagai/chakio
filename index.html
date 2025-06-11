@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>TTTTTIIIIIICCCCCKKKK</title>
+  <title>画像表示ページ</title>
   <style>
     html, body {
       height: 100%;
@@ -11,7 +11,7 @@
       font-family: Arial, sans-serif;
     }
     #controls {
-      padding: 1px;
+      padding: 10px;
       background-color: #444;
       color: #ddd;
       position: sticky;
@@ -20,24 +20,19 @@
     }
     #galleryContainer {
       overflow: auto;
-      padding: 1px;
+      padding: 10px;
       height: calc(100% - 80px);
     }
     .gallery-row {
       display: flex;
-      gap: 1px;
-      white-space: nowrap;
-      width: max-content;
-      margin-bottom: 1px;
-      border-bottom: 1px solid #555;
-      padding-bottom: 1px;
+      gap: 10px;
+      margin-bottom: 10px;
       align-items: center;
     }
     iframe {
       width: 1630px;
       height: 180px;
       border: none;
-      pointer-events: none;
     }
     button, input {
       font-size: 14px;
@@ -61,13 +56,11 @@
 
 <div id="galleryContainer"></div>
 
-<button id="loadMoreBtn">続きを表示</button>
-
 <script>
 const dateTimeInput = document.getElementById('dateTimeInput');
 const galleryContainer = document.getElementById('galleryContainer');
-const loadMoreBtn = document.getElementById('loadMoreBtn');
 const enableZoom = document.getElementById('enableZoom');
+
 let currentDateTime;
 
 async function fetchImages(url) {
@@ -87,73 +80,35 @@ function getFormattedDate(date) {
 async function loadImages() {
   galleryContainer.innerHTML = '';
   currentDateTime = new Date(dateTimeInput.value);
-  currentDateTime.setHours(currentDateTime.getHours() - 6);
-  await loadMultipleDaysImages(currentDateTime, 5);
-}
+  currentDateTime.setHours(currentDateTime.getHours() - 6); // オフセット補正
 
-async function loadMultipleDaysImages(dateObj, daysCount) {
-  let loadedDays = 0;
-  let currentDate = new Date(dateObj);
+  const formattedDate = getFormattedDate(currentDateTime);
+  const limitPerDay = 1; // ← ここを2や3に変えることで1日あたりの画像数を切り替え可能
+  const dayCount = 30;
+  const url = `https://script.google.com/macros/s/AKfycbyV4UBMQSn-ttChtvBiD-D3-a-Yy8FiyfDRhvHlOsZb7Nyhhe-uuYHimw8N6fdPk-eN/exec?afterDate=${formattedDate}&limit=${limitPerDay}&days=${dayCount}`;
+  const allItems = await fetchImages(url);
 
-  while (loadedDays < daysCount) {
-    await loadAndDisplayImages(new Date(currentDate));
-    currentDate.setDate(currentDate.getDate() - 1);
-    loadedDays++;
-  }
-}
-
-async function loadAndDisplayImages(dateObj) {
-  let retries = 0;
-  const maxRetries = 5;
-  let imagesLoaded = false;
-
-  const row = document.createElement('div');
-  row.className = 'gallery-row';
-
-  const loadingText = document.createElement('div');
-  loadingText.className = 'loading';
-  loadingText.textContent = '画像を読込中...';
-  row.appendChild(loadingText);
-  galleryContainer.appendChild(row);
-
-  while (retries < maxRetries && !imagesLoaded) {
-    const formattedDate = getFormattedDate(dateObj);
-    const url = `https://script.google.com/macros/s/AKfycbxdMEGa4DpqZElP2wALr_NIEWt4kvfWA3d6sfFlXBsPkQGINBWAMv3NzRNx4gCatRQV/exec?afterDate=${formattedDate}&limit=1`;
-
-    const items = await fetchImages(url);
-
-    if (items.length > 0 && items.some(item => item.name.startsWith(formattedDate))) {
-      row.removeChild(loadingText);
-      displayImages(items, row);
-      imagesLoaded = true;
-    } else {
-      dateObj.setDate(dateObj.getDate() - 1);
-      retries++;
-    }
-  }
-
-  if (!imagesLoaded) {
-    row.removeChild(loadingText);
+  if (allItems.length === 0) {
+    const row = document.createElement('div');
+    row.className = 'gallery-row';
     const noImage = document.createElement('div');
     noImage.textContent = '画像が見つかりませんでした。';
     noImage.className = 'loading';
     row.appendChild(noImage);
+    galleryContainer.appendChild(row);
+    return;
   }
-}
 
-function displayImages(items, row) {
-  items.forEach(item => {
+  allItems.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'gallery-row';
     const iframe = document.createElement('iframe');
     iframe.src = item.url;
     iframe.style.pointerEvents = enableZoom.checked ? 'auto' : 'none';
     row.appendChild(iframe);
+    galleryContainer.appendChild(row);
   });
 }
-
-loadMoreBtn.addEventListener("click", async () => {
-  currentDateTime.setDate(currentDateTime.getDate() - 1);
-  await loadMultipleDaysImages(currentDateTime, 5);
-});
 
 enableZoom.addEventListener('change', () => {
   const iframes = document.querySelectorAll('iframe');
@@ -165,14 +120,13 @@ enableZoom.addEventListener('change', () => {
 function setDefaultDateTime() {
   const now = new Date();
   now.setHours(9, 6, 0, 0);
-
   const offset = now.getTimezoneOffset() * 60000;
-  const localISOTime = (new Date(now - offset)).toISOString().slice(0,16);
-
+  const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
   dateTimeInput.value = localISOTime;
 }
 
 window.onload = setDefaultDateTime;
 </script>
+
 </body>
 </html>
