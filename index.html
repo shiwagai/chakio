@@ -21,7 +21,7 @@
     #galleryContainer {
       overflow: auto;
       padding: 10px;
-      height: calc(100% - 80px);
+      height: calc(100% - 200px);
     }
     .gallery-row {
       display: flex;
@@ -35,14 +35,31 @@
       border: none;
     }
     button, input {
-      font-size: 14px;
-      padding: 5px 8px;
-      margin: 0 5px 0 0;
+      font-size: 13px;
+      padding: 2px 4px;
+      margin: 0 5px 5px 0;
+    }
+    .highlight {
+      background-color: #c00;
+      color: #fff;
+      border: 1px solid #900;
     }
     .loading {
       color: #aaa;
       font-size: 16px;
       padding: 10px;
+    }
+    #loadMoreBtn {
+      margin: 20px auto 5px;
+      display: block;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+    #loadingIndicator {
+      text-align: center;
+      color: #aaa;
+      font-size: 14px;
+      height: 20px;
     }
   </style>
 </head>
@@ -50,22 +67,65 @@
 
 <div id="controls">
   <input type="datetime-local" id="dateTimeInput">
-  <button onclick="loadImages()">画像を読み込む</button>
-  <label><input type="checkbox" id="enableZoom"> 拡大を有効にする</label>
+  <button onclick="loadImages()">画像読込</button>
+  <label><input type="checkbox" id="enableZoom"> 拡大有効</label>
+   <label id="timeButtons"></label>
 </div>
 
 <div id="galleryContainer"></div>
+
+<button id="loadMoreBtn">続きを表示</button>
+<div id="loadingIndicator"></div>
 
 <script>
 const dateTimeInput = document.getElementById('dateTimeInput');
 const galleryContainer = document.getElementById('galleryContainer');
 const enableZoom = document.getElementById('enableZoom');
+const loadMoreBtn = document.getElementById('loadMoreBtn');
+const loadingIndicator = document.getElementById('loadingIndicator');
 
 let currentDateTime;
+const dayCount = 10;
+const limitPerDay = 1;
+let isLoading = false;
 
-async function fetchImages(url) {
-  const response = await fetch(url);
-  return await response.json();
+const timeList = [
+  "08:06", "09:06", "09:56", "10:06", "10:36", "11:06", "12:06",
+  "13:06", "14:06", "15:06", "15:36", "16:06", "17:06", "18:06", "19:06",
+  "20:06", "21:06", "22:06", "22:36", "23:06", "00:06", "01:06",
+  "02:06"
+];
+const highlightTimes = ["09:06", "09:56", "10:36", "16:06", "22:36", "00:06"];
+
+function createTimeButtons() {
+  const container = document.getElementById('timeButtons');
+  timeList.forEach(time => {
+    const btn = document.createElement('button');
+    btn.textContent = time;
+
+    // シングルクリック: 時刻のみ設定
+    btn.onclick = () => setTime(time);
+
+    // ダブルクリック: 設定＋読み込み
+    btn.ondblclick = () => {
+      setTime(time);
+      loadImages();
+    };
+
+    if (highlightTimes.includes(time)) {
+      btn.classList.add('highlight');
+    }
+    container.appendChild(btn);
+  });
+}
+
+function setTime(hhmm) {
+  const date = new Date(dateTimeInput.value || new Date());
+  const [hour, minute] = hhmm.split(':').map(Number);
+  date.setHours(hour, minute, 0, 0);
+  const offset = date.getTimezoneOffset() * 60000;
+  const localISOTime = new Date(date - offset).toISOString().slice(0, 16);
+  dateTimeInput.value = localISOTime;
 }
 
 function getFormattedDate(date) {
@@ -77,14 +137,25 @@ function getFormattedDate(date) {
   return `${y}-${m}-${d}-${h}-${min}`;
 }
 
+async function fetchImages(url) {
+  const response = await fetch(url);
+  return await response.json();
+}
+
 async function loadImages() {
   galleryContainer.innerHTML = '';
   currentDateTime = new Date(dateTimeInput.value);
-  currentDateTime.setHours(currentDateTime.getHours() - 6); // オフセット補正
+  currentDateTime.setHours(currentDateTime.getHours() - 6); // 補正
+  await loadMoreImages();
+}
+
+async function loadMoreImages() {
+  if (isLoading) return;
+  isLoading = true;
+  loadMoreBtn.disabled = true;
+  loadingIndicator.textContent = "読込中...";
 
   const formattedDate = getFormattedDate(currentDateTime);
-  const limitPerDay = 1; // ← ここを2や3に変えることで1日あたりの画像数を切り替え可能
-  const dayCount = 30;
   const url = `https://script.google.com/macros/s/AKfycbyV4UBMQSn-ttChtvBiD-D3-a-Yy8FiyfDRhvHlOsZb7Nyhhe-uuYHimw8N6fdPk-eN/exec?afterDate=${formattedDate}&limit=${limitPerDay}&days=${dayCount}`;
   const allItems = await fetchImages(url);
 
@@ -96,18 +167,25 @@ async function loadImages() {
     noImage.className = 'loading';
     row.appendChild(noImage);
     galleryContainer.appendChild(row);
-    return;
+  } else {
+    allItems.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'gallery-row';
+      const iframe = document.createElement('iframe');
+      iframe.src = item.url;
+      iframe.style.pointerEvents = enableZoom.checked ? 'auto' : 'none';
+      row.appendChild(iframe);
+      galleryContainer.appendChild(row);
+    });
   }
 
-  allItems.forEach(item => {
-    const row = document.createElement('div');
-    row.className = 'gallery-row';
-    const iframe = document.createElement('iframe');
-    iframe.src = item.url;
-    iframe.style.pointerEvents = enableZoom.checked ? 'auto' : 'none';
-    row.appendChild(iframe);
-    galleryContainer.appendChild(row);
-  });
+  currentDateTime.setDate(currentDateTime.getDate() - dayCount);
+
+  setTimeout(() => {
+    isLoading = false;
+    loadMoreBtn.disabled = false;
+    loadingIndicator.textContent = '';
+  }, 3000);
 }
 
 enableZoom.addEventListener('change', () => {
@@ -121,11 +199,16 @@ function setDefaultDateTime() {
   const now = new Date();
   now.setHours(9, 6, 0, 0);
   const offset = now.getTimezoneOffset() * 60000;
-  const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
+  const localISOTime = new Date(now - offset).toISOString().slice(0, 16);
   dateTimeInput.value = localISOTime;
 }
 
-window.onload = setDefaultDateTime;
+loadMoreBtn.addEventListener('click', loadMoreImages);
+
+window.onload = () => {
+  setDefaultDateTime();
+  createTimeButtons();
+};
 </script>
 
 </body>
